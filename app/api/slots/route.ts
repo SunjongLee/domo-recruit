@@ -7,6 +7,7 @@ const WORK_START_HOUR = 9;
 const WORK_END_HOUR = 18;
 const DAYS_AHEAD = 14;
 const TZ = 'Asia/Seoul';
+const DEFAULT_INTERVIEWER_EMAIL = 'robin@domo.co.kr';
 
 function getAuth() {
   return new google.auth.JWT({
@@ -65,12 +66,12 @@ export async function GET(request: NextRequest) {
 
   if (error || !candidate) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
-  const interviewerEmail =
+  const assignedEmail =
     candidate.status === '1차면접'
       ? candidate.round1_interviewer_email
       : candidate.round2_interviewer_email;
 
-  if (!interviewerEmail) return NextResponse.json({ slots: [] });
+  const interviewerEmail = assignedEmail || DEFAULT_INTERVIEWER_EMAIL;
 
   try {
     const auth = getAuth();

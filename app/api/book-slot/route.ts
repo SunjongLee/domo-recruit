@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabase';
 
 const SLOT_DURATION_MIN = 60;
 const TZ = 'Asia/Seoul';
+const DEFAULT_INTERVIEWER_EMAIL = 'robin@domo.co.kr';
 
 function getAuth() {
   return new google.auth.JWT({
@@ -29,14 +30,12 @@ export async function POST(request: NextRequest) {
 
   if (fetchError || !candidate) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
-  const interviewerEmail =
+  const assignedEmail =
     candidate.status === '1차면접'
       ? candidate.round1_interviewer_email
       : candidate.round2_interviewer_email;
 
-  if (!interviewerEmail) {
-    return NextResponse.json({ error: 'no interviewer assigned' }, { status: 400 });
-  }
+  const interviewerEmail = assignedEmail || DEFAULT_INTERVIEWER_EMAIL;
 
   try {
     const auth = getAuth();
@@ -64,8 +63,12 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const scheduledField = candidate.status === '1차면접' ? 'round1_scheduled_at' : 'round2_scheduled_at';
-    await db.from('candidates').update({ [scheduledField]: startTime.toISOString() }).eq('uuid', uuid);
+    const isRound1 = candidate.status === '1차면접';
+    const scheduledField = isRound1 ? 'round1_scheduled_at' : 'round2_scheduled_at';
+    const interviewerField = isRound1 ? 'round1_interviewer_email' : 'round2_interviewer_email';
+    await db.from('candidates')
+      .update({ [scheduledField]: startTime.toISOString(), [interviewerField]: interviewerEmail })
+      .eq('uuid', uuid);
 
     return NextResponse.json({ success: true, eventId: event.data.id });
   } catch (err: unknown) {
