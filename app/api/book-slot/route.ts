@@ -44,26 +44,38 @@ export async function POST(request: NextRequest) {
     const startTime = new Date(datetime);
     const endTime = new Date(startTime.getTime() + SLOT_DURATION_MIN * 60 * 1000);
 
-    const round = candidate.status === '1차면접' ? '1차' : '2차';
+    const isRound1 = candidate.status === '1차면접';
+    const round = isRound1 ? '1차' : '2차';
 
     const event = await calendar.events.insert({
       calendarId: 'primary',
-      sendUpdates: 'none',
+      sendUpdates: 'all',
+      conferenceDataVersion: 1,
       requestBody: {
         summary: `[도모 인터뷰] ${candidate.name} — ${candidate.position} (${round})`,
         description: `도모 채용 인터뷰\n\n지원자: ${candidate.name}\n포지션: ${candidate.position}\n이메일: ${candidate.email}\n연락처: ${candidate.phone}\n담당자: ${interviewerEmail}`,
         start: { dateTime: startTime.toISOString(), timeZone: TZ },
         end: { dateTime: endTime.toISOString(), timeZone: TZ },
+        attendees: [
+          { email: candidate.email, displayName: candidate.name },
+          { email: interviewerEmail },
+        ],
+        conferenceData: {
+          createRequest: {
+            requestId: `domo-recruit-${uuid}-${isRound1 ? 'r1' : 'r2'}-${startTime.getTime()}`,
+            conferenceSolutionKey: { type: 'hangoutsMeet' },
+          },
+        },
         reminders: {
           useDefault: false,
           overrides: [
+            { method: 'email', minutes: 24 * 60 },
             { method: 'popup', minutes: 30 },
           ],
         },
       },
     });
 
-    const isRound1 = candidate.status === '1차면접';
     const scheduledField = isRound1 ? 'round1_scheduled_at' : 'round2_scheduled_at';
     const interviewerField = isRound1 ? 'round1_interviewer_email' : 'round2_interviewer_email';
     await db.from('candidates')
